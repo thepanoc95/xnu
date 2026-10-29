@@ -1,0 +1,53 @@
+# Repository notes (xnu fork: thepanoc95/xnu)
+
+A port of XNU (iOS 7 era) to run on non-Apple ARM boards, with the end goal of
+booting iOS 7 userland on the Motorola Moto G4 Play ("harpia", XT1603,
+Qualcomm MSM8916 / Snapdragon 410).
+
+## Build system
+
+* Plain BSD-style `make`. Targets are selected with
+  `make TARGET_CONFIGS="<kernel> <arch> <machine>"`, or via the
+  `machine_configuration` file read by the `xnu-build` script.
+* `MACHINE_CONFIG` is uppercased and used as `-DBOARD_CONFIG_$(MACHINE_CONFIG)`
+  (see `makedefs/MakeInc.def`). Every platform file is wrapped in
+  `#if defined(BOARD_CONFIG_XXX)`.
+* Adding a new ARM SoC/machine touches exactly these places:
+  1. `makedefs/MakeInc.def` - add to `SUPPORTED_ARM_MACHINE_CONFIGS` and add an
+     `ARCH_FLAGS_ARM_<MACHINE> = -arch armv7|armv6` line.
+  2. `pexpert/conf/files.arm` - add `pexpert/arm/pe_<soc>.c  standard`.
+  3. `osfmk/arm/PlatformConfigs.h` - add a `BOARD_CONFIG_<MACHINE>` block that
+     defines the `__ARM_PROCESSOR_CLASS_*__` macro for that core.
+  4. `machine_configuration` and `README` - optional convenience/listing.
+* `osfmk/arm/armv/cache.s` has per-board L2 cache hacks keyed on
+  `BOARD_CONFIG_*`; only add one if the core genuinely needs it.
+
+## Platform Expert (pexpert/arm)
+
+* `pe_<soc>.c` fills in the `gPESocDispatch` table (see
+  `pexpert/pexpert/arm/protos.h`) and defines `PE_init_SocSupport_stub()`,
+  which `pexpert/arm/common/pe_socsupport.c` calls.
+* `pe_<soc>.c` must NOT be added to `xnu/xnu.xcodeproj/project.pbxproj`; only a
+  legacy subset of PEs is listed there. `files.arm` is authoritative.
+* The architected (generic) ARM timer is the cleanest timebase for modern
+  boards: CNTFRQ/CNTPCT/CNTP_TVAL/CNTP_CTL via `mrc/mcr p15, 0, ..., c14`.
+  `get_timebase` should return CNTPCT directly (free-running), so no
+  accumulate-absolute-time bookkeeping is needed.
+* The `uart_putc`/`uart_getc`/`halt_restart` callback signatures differ from
+  the local function types by `char` vs `int`; the build suppresses that with
+  `-Wno-incompatible-pointer-types`.
+
+## MSM8916 / harpia hardware facts (verified)
+
+* Console UART: BLSP1 UART1 at `0x078af000` (size `0x200`), GIC SPI 107,
+  `compatible = "qcom,msm-uartdm-v1.4"`.
+* UARTDM v1.4 ("BLSP") register map: TF `0x100`, RF `0x140`, SR `0xA4`,
+  CR `0xA8`, CSR `0xA0`, MISR `0xAC`, IMR `0xB0`, ISR `0xB4`, NCF_TX `0x40`.
+  This is confirmed by both the LK bootloader (BLSP map) and the downstream
+  Qualcomm HSL driver (`UARTDM_VERSION_14` table). The legacy pre-BLSP map
+  (TF `0x70`, SR `0x08`, CR `0x10`) does NOT apply here, despite mainline
+  `msm_serial.c` using those constants for `qcom,msm-uartdm`.
+* QGIC2 (GICv2): distributor `0x0b000000` (0x1000), CPU interface `0x0b002000`
+  (0x2000), compatible `qcom,msm-qgic2`.
+* Timer: `arm,armv7-timer` (architected). Non-secure physical timer is PPI 3.
+  `clock-frequency = 19200000`; CNTFRQ is populated by the firmware.
