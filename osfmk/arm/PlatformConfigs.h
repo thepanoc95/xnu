@@ -37,6 +37,12 @@
 #define __ARM_PROCESSOR_CLASS_QUALCOMM_A9__		1
 #endif
 
+/* ARMv7 Cortex-A53 platforms. */
+
+#ifdef BOARD_CONFIG_MSM8916
+#define __ARM_PROCESSOR_CLASS_CORTEX_A53__		1
+#endif
+
 /* ARMv7 Cortex-A8 platforms. */
 
 #ifdef BOARD_CONFIG_S5L8920X

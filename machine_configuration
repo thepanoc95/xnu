@@ -19,3 +19,6 @@ release arm s5l8930x
 release arm s5l8920x
 release arm s5l8922x
 release arm omap3430_rx51
+debug arm msm8916
+development arm msm8916
+release arm msm8916

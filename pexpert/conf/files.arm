@@ -19,3 +19,4 @@ pexpert/arm/pe_s5l8900x.c		standard
 pexpert/arm/pe_s5l8930x.c		standard
 pexpert/arm/pe_apq8060.c		standard
 pexpert/arm/pe_imx53.c			standard
+pexpert/arm/pe_msm8916.c		standard
